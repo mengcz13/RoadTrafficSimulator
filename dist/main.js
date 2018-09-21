@@ -388,7 +388,8 @@ Function.prototype.property = function(prop, desc) {
 
 },{}],7:[function(require,module,exports){
 'use strict';
-var Car, Trajectory, max, min, random, sqrt, _;
+var Car, Trajectory, max, min, random, sqrt, _,
+  __indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
 max = Math.max, min = Math.min, random = Math.random, sqrt = Math.sqrt;
 
@@ -399,7 +400,7 @@ _ = require('underscore');
 Trajectory = require('./trajectory');
 
 Car = (function() {
-  function Car(lane, position) {
+  function Car(target, nexts, lane, position) {
     this.id = _.uniqueId('car');
     this.color = (300 + 240 * random() | 0) % 360;
     this._speed = 0;
@@ -413,6 +414,8 @@ Car = (function() {
     this.trajectory = new Trajectory(this, lane, position);
     this.alive = true;
     this.preferedLane = null;
+    this.target = target;
+    this.nexts = nexts;
   }
 
   Car.property('coords', {
@@ -499,16 +502,29 @@ Car = (function() {
   };
 
   Car.prototype.pickNextRoad = function() {
-    var currentLane, intersection, nextRoad, possibleRoads;
+    var bestRoads, currentLane, intersection, nextRoad, nexts, possibleRoads, target;
     intersection = this.trajectory.nextIntersection;
     currentLane = this.trajectory.current.lane;
+    nexts = this.nexts;
+    target = this.target;
+    if (intersection.id === this.target.id) {
+      return null;
+    }
     possibleRoads = intersection.roads.filter(function(x) {
       return x.target !== currentLane.road.source;
     });
     if (possibleRoads.length === 0) {
       return null;
     }
-    return nextRoad = _.sample(possibleRoads);
+    bestRoads = possibleRoads.filter(function(x) {
+      var _ref;
+      return _ref = x.target.id, __indexOf.call(nexts[[intersection.id, target.id]], _ref) >= 0;
+    });
+    if (bestRoads.length > 0) {
+      return nextRoad = _.sample(bestRoads);
+    } else {
+      return nextRoad = _.sample(possibleRoads);
+    }
   };
 
   Car.prototype.pickNextLane = function() {
@@ -1521,7 +1537,6 @@ World = (function() {
       }
     }
     this.shortestPaths = this._calcShortestPaths();
-    console.log(this.shortestPaths);
     return null;
   };
 
@@ -1578,7 +1593,6 @@ World = (function() {
         }
       }
     }
-    console.log(dists);
     return nexts;
   };
 
@@ -1653,12 +1667,13 @@ World = (function() {
   };
 
   World.prototype.addRandomCar = function() {
-    var lane, road;
+    var lane, road, target;
+    target = _.sample(this.intersections.all());
     road = _.sample(this.roads.all());
     if (road != null) {
       lane = _.sample(road.lanes);
       if (lane != null) {
-        return this.addCar(new Car(lane));
+        return this.addCar(new Car(target, this.shortestPaths, lane));
       }
     }
   };

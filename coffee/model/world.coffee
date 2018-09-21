@@ -116,9 +116,6 @@ class World
           else if (newdist == dists[[iid, jid]])
             nexts[[iid, jid]] = _.union(nexts[[iid, jid]], nexts[[iid, kid]])
     nexts
-    
-
-    
 
   clear: ->
     @set {}
@@ -162,10 +159,11 @@ class World
     @intersections.get id
 
   addRandomCar: ->
+    target = _.sample @intersections.all()
     road = _.sample @roads.all()
     if road?
       lane = _.sample road.lanes
-      @addCar new Car lane if lane?
+      @addCar new Car target, @shortestPaths, lane if lane?
 
   removeRandomCar: ->
     car = _.sample @cars.all()

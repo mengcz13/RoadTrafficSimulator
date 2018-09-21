@@ -6,7 +6,7 @@ _ = require 'underscore'
 Trajectory = require './trajectory'
 
 class Car
-  constructor: (lane, position) ->
+  constructor: (target, nexts, lane, position) ->
     @id = _.uniqueId 'car'
     @color = (300 + 240 * random() | 0) % 360
     @_speed = 0
@@ -20,6 +20,10 @@ class Car
     @trajectory = new Trajectory this, lane, position
     @alive = true
     @preferedLane = null
+    # set a target intersection
+    @target = target
+    # set routes
+    @nexts = nexts
 
   @property 'coords',
     get: -> @trajectory.coords
@@ -80,10 +84,21 @@ class Car
   pickNextRoad: ->
     intersection = @trajectory.nextIntersection
     currentLane = @trajectory.current.lane
+    nexts = @nexts
+    target = @target
+    if intersection.id == @target.id
+      return null
+    # possible roads we can arrive
     possibleRoads = intersection.roads.filter (x) ->
       x.target isnt currentLane.road.source
     return null if possibleRoads.length is 0
-    nextRoad = _.sample possibleRoads
+    # best roads we can choose
+    bestRoads = possibleRoads.filter (x) ->
+      x.target.id in nexts[[intersection.id, target.id]]
+    if bestRoads.length > 0
+      nextRoad = _.sample bestRoads
+    else
+      nextRoad = _.sample possibleRoads
 
   pickNextLane: ->
     throw Error 'next lane is already chosen' if @nextLane
