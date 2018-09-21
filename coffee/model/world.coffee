@@ -80,8 +80,45 @@ class World
             @addRoad new Road intersection, previous if previous?
             @addRoad new Road previous, intersection if previous?
           previous = intersection
+
+    @shortestPaths = @_calcShortestPaths()
+
     null
 
+  _calcShortestPaths: ->
+    dists = {}
+    nexts = {}
+    conns = {}
+    for roadid, road of @roads.all()
+      sid = road.source.id
+      tid = road.target.id
+      conns[[sid, tid]] = road.length
+      dists[[sid, tid]] = road.length
+      nexts[[sid, tid]] = [tid, ]
+    for id, intersection of @intersections.all()
+      conns[[id, id]] = 0
+      dists[[id, id]] = 0
+      nexts[[id, id]] = []
+    for iiid, ii of @intersections.all()
+      for ijid, ij of @intersections.all()
+        conn = conns[[iiid, ijid]]
+        if not conn?
+          dists[[iiid, ijid]] = Infinity
+          nexts[[iiid, ijid]] = []
+
+    for kid, k of @intersections.all()
+      for iid, i of @intersections.all()
+        for jid, j of @intersections.all()
+          newdist = dists[[iid, kid]] + dists[[kid, jid]]
+          if (newdist < dists[[iid, jid]])
+            dists[[iid, jid]] = newdist
+            nexts[[iid, jid]] = nexts[[iid, kid]]
+          else if (newdist == dists[[iid, jid]])
+            nexts[[iid, jid]] = _.union(nexts[[iid, jid]], nexts[[iid, kid]])
+    nexts
+    
+
+    
 
   clear: ->
     @set {}

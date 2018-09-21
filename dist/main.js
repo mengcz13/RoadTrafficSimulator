@@ -1520,7 +1520,66 @@ World = (function() {
         }
       }
     }
+    this.shortestPaths = this._calcShortestPaths();
+    console.log(this.shortestPaths);
     return null;
+  };
+
+  World.prototype._calcShortestPaths = function() {
+    var conn, conns, dists, i, id, ii, iid, iiid, ij, ijid, intersection, j, jid, k, kid, newdist, nexts, road, roadid, sid, tid, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6;
+    dists = {};
+    nexts = {};
+    conns = {};
+    _ref = this.roads.all();
+    for (roadid in _ref) {
+      road = _ref[roadid];
+      sid = road.source.id;
+      tid = road.target.id;
+      conns[[sid, tid]] = road.length;
+      dists[[sid, tid]] = road.length;
+      nexts[[sid, tid]] = [tid];
+    }
+    _ref1 = this.intersections.all();
+    for (id in _ref1) {
+      intersection = _ref1[id];
+      conns[[id, id]] = 0;
+      dists[[id, id]] = 0;
+      nexts[[id, id]] = [];
+    }
+    _ref2 = this.intersections.all();
+    for (iiid in _ref2) {
+      ii = _ref2[iiid];
+      _ref3 = this.intersections.all();
+      for (ijid in _ref3) {
+        ij = _ref3[ijid];
+        conn = conns[[iiid, ijid]];
+        if (conn == null) {
+          dists[[iiid, ijid]] = Infinity;
+          nexts[[iiid, ijid]] = [];
+        }
+      }
+    }
+    _ref4 = this.intersections.all();
+    for (kid in _ref4) {
+      k = _ref4[kid];
+      _ref5 = this.intersections.all();
+      for (iid in _ref5) {
+        i = _ref5[iid];
+        _ref6 = this.intersections.all();
+        for (jid in _ref6) {
+          j = _ref6[jid];
+          newdist = dists[[iid, kid]] + dists[[kid, jid]];
+          if (newdist < dists[[iid, jid]]) {
+            dists[[iid, jid]] = newdist;
+            nexts[[iid, jid]] = nexts[[iid, kid]];
+          } else if (newdist === dists[[iid, jid]]) {
+            nexts[[iid, jid]] = _.union(nexts[[iid, jid]], nexts[[iid, kid]]);
+          }
+        }
+      }
+    }
+    console.log(dists);
+    return nexts;
   };
 
   World.prototype.clear = function() {
