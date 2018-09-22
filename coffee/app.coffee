@@ -34,4 +34,6 @@ $ ->
   guiVisualizer.add(visualizer, 'timeFactor', 0.1, 10).listen()
   guiWorld.add(world, 'carsNumber').min(0).max(200).step(1).listen()
   guiWorld.add(world, 'instantSpeed').step(0.00001).listen()
+  guiWorld.add(world, 'laneNum').min(1).max(4).step(1).listen()
+  guiWorld.add(world, 'netSize').min(2).max(15).step(1).listen()
   gui.add(settings, 'lightsFlipInterval', 0, 400, 0.01).listen()

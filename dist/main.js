@@ -45,6 +45,8 @@ $(function() {
   guiVisualizer.add(visualizer, 'timeFactor', 0.1, 10).listen();
   guiWorld.add(world, 'carsNumber').min(0).max(200).step(1).listen();
   guiWorld.add(world, 'instantSpeed').step(0.00001).listen();
+  guiWorld.add(world, 'laneNum').min(1).max(4).step(1).listen();
+  guiWorld.add(world, 'netSize').min(2).max(15).step(1).listen();
   return gui.add(settings, 'lightsFlipInterval', 0, 400, 0.01).listen();
 });
 
@@ -1026,9 +1028,10 @@ Lane = require('./lane');
 settings = require('../settings');
 
 Road = (function() {
-  function Road(source, target) {
+  function Road(source, target, maxLanesNumber) {
     this.source = source;
     this.target = target;
+    this.maxLanesNumber = maxLanesNumber != null ? maxLanesNumber : 2;
     this.id = _.uniqueId('road');
     this.lanes = [];
     this.lanesNumber = null;
@@ -1092,7 +1095,7 @@ Road = (function() {
     this.targetSideId = this.target.rect.getSectorId(this.source.rect.center());
     this.targetSide = this.target.rect.getSide(this.targetSideId).subsegment(0, 0.5);
     this.lanesNumber = min(this.sourceSide.length, this.targetSide.length) | 0;
-    this.lanesNumber = max(2, this.lanesNumber / settings.gridSize | 0);
+    this.lanesNumber = max(this.maxLanesNumber, this.lanesNumber / settings.gridSize | 0);
     sourceSplits = this.sourceSide.split(this.lanesNumber, true);
     targetSplits = this.targetSide.split(this.lanesNumber);
     if ((this.lanes == null) || this.lanes.length < this.lanesNumber) {
@@ -1411,6 +1414,8 @@ World = (function() {
   function World() {
     this.onTick = __bind(this.onTick, this);
     this.set({});
+    this.laneNum = 2;
+    this.netSize = 5;
   }
 
   World.property('instantSpeed', {
@@ -1472,23 +1477,17 @@ World = (function() {
     return _results;
   };
 
-  World.prototype.generateMap = function(minX, maxX, minY, maxY) {
-    var gridSize, intersection, intersectionsNumber, map, previous, rect, step, x, y, _i, _j, _k, _l;
-    if (minX == null) {
-      minX = -2;
-    }
-    if (maxX == null) {
-      maxX = 2;
-    }
-    if (minY == null) {
-      minY = -2;
-    }
-    if (maxY == null) {
-      maxY = 2;
-    }
+  World.prototype.generateMap = function() {
+    var gridSize, intersection, intersectionsNumber, laneNum, map, maxX, maxY, minX, minY, netSize, previous, rect, step, x, y, _i, _j, _k, _l;
     this.clear();
+    minX = 0;
+    maxX = this.netSize - 1;
+    minY = 0;
+    maxY = this.netSize - 1;
     intersectionsNumber = (0.8 * (maxX - minX + 1) * (maxY - minY + 1)) | 0;
     map = {};
+    laneNum = this.laneNum;
+    netSize = this.netSize;
     gridSize = settings.gridSize;
     step = 5 * gridSize;
     this.carsNumber = 100;
@@ -1509,10 +1508,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous));
+              this.addRoad(new Road(intersection, previous, laneNum));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection));
+              this.addRoad(new Road(previous, intersection, laneNum));
             }
           }
           previous = intersection;
@@ -1526,10 +1525,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous));
+              this.addRoad(new Road(intersection, previous, laneNum));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection));
+              this.addRoad(new Road(previous, intersection, laneNum));
             }
           }
           previous = intersection;

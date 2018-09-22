@@ -7,7 +7,7 @@ Lane = require './lane'
 settings = require '../settings'
 
 class Road
-  constructor: (@source, @target) ->
+  constructor: (@source, @target, @maxLanesNumber = 2) ->
     @id = _.uniqueId 'road'
     @lanes = []
     @lanesNumber = null
@@ -48,7 +48,7 @@ class Road
     @targetSideId = @target.rect.getSectorId @source.rect.center()
     @targetSide = @target.rect.getSide(@targetSideId).subsegment 0, 0.5
     @lanesNumber = min(@sourceSide.length, @targetSide.length) | 0
-    @lanesNumber = max 2, @lanesNumber / settings.gridSize | 0
+    @lanesNumber = max @maxLanesNumber, @lanesNumber / settings.gridSize | 0
     sourceSplits = @sourceSide.split @lanesNumber, true
     targetSplits = @targetSide.split @lanesNumber
     if not @lanes? or @lanes.length < @lanesNumber

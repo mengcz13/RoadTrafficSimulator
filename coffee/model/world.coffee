@@ -13,6 +13,8 @@ settings = require '../settings'
 class World
   constructor: ->
     @set {}
+    @laneNum = 2
+    @netSize = 5
 
   @property 'instantSpeed',
     get: ->
@@ -47,10 +49,16 @@ class World
       road.target = @getIntersection road.target
       @addRoad road
 
-  generateMap: (minX = -2, maxX = 2, minY = -2, maxY = 2) ->
+  generateMap: ->
     @clear()
+    minX = 0
+    maxX = @netSize - 1
+    minY = 0
+    maxY = @netSize - 1
     intersectionsNumber = (0.8 * (maxX - minX + 1) * (maxY - minY + 1)) | 0
     map = {}
+    laneNum = @laneNum
+    netSize = @netSize
     gridSize = settings.gridSize
     step = 5 * gridSize
     @carsNumber = 100
@@ -68,8 +76,8 @@ class World
         intersection = map[[x, y]]
         if intersection?
           if random() < 0.9
-            @addRoad new Road intersection, previous if previous?
-            @addRoad new Road previous, intersection if previous?
+            @addRoad new Road intersection, previous, laneNum if previous?
+            @addRoad new Road previous, intersection, laneNum if previous?
           previous = intersection
     for y in [minY..maxY]
       previous = null
@@ -77,8 +85,8 @@ class World
         intersection = map[[x, y]]
         if intersection?
           if random() < 0.9
-            @addRoad new Road intersection, previous if previous?
-            @addRoad new Road previous, intersection if previous?
+            @addRoad new Road intersection, previous, laneNum if previous?
+            @addRoad new Road previous, intersection, laneNum if previous?
           previous = intersection
 
     @shortestPaths = @_calcShortestPaths()
