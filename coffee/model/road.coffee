@@ -7,7 +7,7 @@ Lane = require './lane'
 settings = require '../settings'
 
 class Road
-  constructor: (@source, @target, @maxLanesNumber = 2) ->
+  constructor: (@source, @target, @maxLanesNumber, @sensorNum) ->
     @id = _.uniqueId 'road'
     @lanes = []
     @lanesNumber = null
@@ -54,7 +54,7 @@ class Road
     if not @lanes? or @lanes.length < @lanesNumber
       @lanes ?= []
       for i in [0..@lanesNumber - 1]
-        @lanes[i] ?= new Lane sourceSplits[i], targetSplits[i], this
+        @lanes[i] ?= new Lane sourceSplits[i], targetSplits[i], this, @sensorNum
     for i in [0..@lanesNumber - 1]
       @lanes[i].sourceSegment = sourceSplits[i]
       @lanes[i].targetSegment = targetSplits[i]
@@ -63,5 +63,9 @@ class Road
       @lanes[i].leftmostAdjacent = @lanes[@lanesNumber - 1]
       @lanes[i].rightmostAdjacent = @lanes[0]
       @lanes[i].update()
+
+  updateSensors: ->
+    for i in [0..@lanesNumber - 1]
+      @lanes[i].updateSensors()
 
 module.exports = Road

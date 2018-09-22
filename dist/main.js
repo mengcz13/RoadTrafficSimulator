@@ -47,11 +47,12 @@ $(function() {
   guiWorld.add(world, 'instantSpeed').step(0.00001).listen();
   guiWorld.add(world, 'laneNum').min(1).max(4).step(1).listen();
   guiWorld.add(world, 'netSize').min(2).max(15).step(1).listen();
+  guiWorld.add(world, 'sensorNum').min(1).max(10).step(1).listen();
   return gui.add(settings, 'lightsFlipInterval', 0, 400, 0.01).listen();
 });
 
 
-},{"./helpers":6,"./model/world":15,"./settings":16,"./visualizer/visualizer":24,"dat-gui":27,"jquery":31,"underscore":32}],2:[function(require,module,exports){
+},{"./helpers":6,"./model/world":16,"./settings":17,"./visualizer/visualizer":25,"dat-gui":28,"jquery":32,"underscore":33}],2:[function(require,module,exports){
 'use strict';
 var Curve, Segment;
 
@@ -305,7 +306,7 @@ Rect = (function() {
 module.exports = Rect;
 
 
-},{"../helpers":6,"./point":3,"./segment":5,"underscore":32}],5:[function(require,module,exports){
+},{"../helpers":6,"./point":3,"./segment":5,"underscore":33}],5:[function(require,module,exports){
 'use strict';
 var Segment;
 
@@ -572,7 +573,7 @@ Car = (function() {
 module.exports = Car;
 
 
-},{"../helpers":6,"./trajectory":14,"underscore":32}],8:[function(require,module,exports){
+},{"../helpers":6,"./trajectory":15,"underscore":33}],8:[function(require,module,exports){
 'use strict';
 var ControlSignals, random, settings,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -680,7 +681,7 @@ ControlSignals = (function() {
 module.exports = ControlSignals;
 
 
-},{"../helpers":6,"../settings":16}],9:[function(require,module,exports){
+},{"../helpers":6,"../settings":17}],9:[function(require,module,exports){
 'use strict';
 var ControlSignals, Intersection, Rect, _;
 
@@ -744,7 +745,7 @@ Intersection = (function() {
 module.exports = Intersection;
 
 
-},{"../geom/rect":4,"../helpers":6,"./control-signals":8,"underscore":32}],10:[function(require,module,exports){
+},{"../geom/rect":4,"../helpers":6,"./control-signals":8,"underscore":33}],10:[function(require,module,exports){
 'use strict';
 var LanePosition, _;
 
@@ -825,9 +826,9 @@ LanePosition = (function() {
 module.exports = LanePosition;
 
 
-},{"../helpers":6,"underscore":32}],11:[function(require,module,exports){
+},{"../helpers":6,"underscore":33}],11:[function(require,module,exports){
 'use strict';
-var Lane, Segment, _;
+var Lane, Segment, Sensor, _;
 
 require('../helpers');
 
@@ -835,17 +836,21 @@ _ = require('underscore');
 
 Segment = require('../geom/segment');
 
+Sensor = require('./sensor');
+
 Lane = (function() {
-  function Lane(sourceSegment, targetSegment, road) {
+  function Lane(sourceSegment, targetSegment, road, sensorNum) {
     this.sourceSegment = sourceSegment;
     this.targetSegment = targetSegment;
     this.road = road;
+    this.sensorNum = sensorNum;
     this.leftAdjacent = null;
     this.rightAdjacent = null;
     this.leftmostAdjacent = null;
     this.rightmostAdjacent = null;
     this.carsPositions = {};
     this.update();
+    this.setSensors();
   }
 
   Lane.prototype.toJSON = function() {
@@ -942,6 +947,45 @@ Lane = (function() {
     return next;
   };
 
+  Lane.prototype.setSensors = function() {
+    var i, _i, _ref, _results;
+    this.sensors = [];
+    this.relativeSensorInterval = 1.0 / this.sensorNum;
+    _results = [];
+    for (i = _i = 0, _ref = this.sensorNum - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
+      _results.push(this.sensors[i] = new Sensor(this, this.relativeSensorInterval * i, this.relativeSensorInterval * (i + 1)));
+    }
+    return _results;
+  };
+
+  Lane.prototype.updateSensors = function() {
+    var car, carPosition, i, id, newCarLists, relativePosition, sensorid, _i, _j, _ref, _ref1, _ref2, _results;
+    newCarLists = [];
+    for (i = _i = 0, _ref = this.sensorNum - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
+      newCarLists[i] = [];
+    }
+    _ref1 = this.carsPositions;
+    for (id in _ref1) {
+      carPosition = _ref1[id];
+      relativePosition = carPosition.relativePosition;
+      if (relativePosition >= 0 && relativePosition <= 1) {
+        car = carPosition.car;
+        sensorid = Math.floor(relativePosition / this.relativeSensorInterval);
+        newCarLists[sensorid].push(car);
+      }
+    }
+    _results = [];
+    for (i = _j = 0, _ref2 = this.sensorNum - 1; 0 <= _ref2 ? _j <= _ref2 : _j >= _ref2; i = 0 <= _ref2 ? ++_j : --_j) {
+      this.sensors[i].update(newCarLists[i]);
+      if (newCarLists[i].length > 1) {
+        _results.push(console.log(this.sensors[i]));
+      } else {
+        _results.push(void 0);
+      }
+    }
+    return _results;
+  };
+
   return Lane;
 
 })();
@@ -949,7 +993,7 @@ Lane = (function() {
 module.exports = Lane;
 
 
-},{"../geom/segment":5,"../helpers":6,"underscore":32}],12:[function(require,module,exports){
+},{"../geom/segment":5,"../helpers":6,"./sensor":14,"underscore":33}],12:[function(require,module,exports){
 'use strict';
 var Pool;
 
@@ -1028,10 +1072,11 @@ Lane = require('./lane');
 settings = require('../settings');
 
 Road = (function() {
-  function Road(source, target, maxLanesNumber) {
+  function Road(source, target, maxLanesNumber, sensorNum) {
     this.source = source;
     this.target = target;
-    this.maxLanesNumber = maxLanesNumber != null ? maxLanesNumber : 2;
+    this.maxLanesNumber = maxLanesNumber;
+    this.sensorNum = sensorNum;
     this.id = _.uniqueId('road');
     this.lanes = [];
     this.lanesNumber = null;
@@ -1104,7 +1149,7 @@ Road = (function() {
       }
       for (i = _i = 0, _ref = this.lanesNumber - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
         if ((_base = this.lanes)[i] == null) {
-          _base[i] = new Lane(sourceSplits[i], targetSplits[i], this);
+          _base[i] = new Lane(sourceSplits[i], targetSplits[i], this, this.sensorNum);
         }
       }
     }
@@ -1121,6 +1166,15 @@ Road = (function() {
     return _results;
   };
 
+  Road.prototype.updateSensors = function() {
+    var i, _i, _ref, _results;
+    _results = [];
+    for (i = _i = 0, _ref = this.lanesNumber - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
+      _results.push(this.lanes[i].updateSensors());
+    }
+    return _results;
+  };
+
   return Road;
 
 })();
@@ -1128,7 +1182,66 @@ Road = (function() {
 module.exports = Road;
 
 
-},{"../helpers":6,"../settings":16,"./lane":11,"underscore":32}],14:[function(require,module,exports){
+},{"../helpers":6,"../settings":17,"./lane":11,"underscore":33}],14:[function(require,module,exports){
+'use strict';
+var Sensor, _;
+
+_ = require('underscore');
+
+Sensor = (function() {
+  function Sensor(lane, starting, ending) {
+    this.lane = lane;
+    this.starting = starting;
+    this.ending = ending;
+    this.id = _.uniqueId('Sensor');
+    this.carList = [];
+    this.volumeIn = 0;
+    this.volumeOut = 0;
+  }
+
+  Sensor.property('carNum', {
+    get: function() {
+      return this.carList.length;
+    }
+  });
+
+  Sensor.property('avgSpeed', {
+    get: function() {
+      var speeds;
+      speeds = _.map(this.carList, function(car) {
+        return car.speed;
+      });
+      if (speeds.length === 0) {
+        return 0;
+      }
+      return (_.reduce(speeds, function(a, b) {
+        return a + b;
+      })) / speeds.length;
+    }
+  });
+
+  Sensor.property('volume', {
+    get: function() {
+      return this.volumeOut;
+    }
+  });
+
+  Sensor.prototype.update = function(newCarList) {
+    var sameCarList;
+    sameCarList = _.intersection(this.carList, newCarList);
+    this.volumeIn = newCarList.length - sameCarList.length;
+    this.volumeOut = this.carList.length - sameCarList.length;
+    return this.carList = newCarList;
+  };
+
+  return Sensor;
+
+})();
+
+module.exports = Sensor;
+
+
+},{"underscore":33}],15:[function(require,module,exports){
 'use strict';
 var Curve, LanePosition, Trajectory, max, min, _;
 
@@ -1387,7 +1500,7 @@ Trajectory = (function() {
 module.exports = Trajectory;
 
 
-},{"../geom/curve":2,"../helpers":6,"./lane-position":10,"underscore":32}],15:[function(require,module,exports){
+},{"../geom/curve":2,"../helpers":6,"./lane-position":10,"underscore":33}],16:[function(require,module,exports){
 'use strict';
 var Car, Intersection, Pool, Rect, Road, World, random, settings, _,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -1416,6 +1529,7 @@ World = (function() {
     this.set({});
     this.laneNum = 2;
     this.netSize = 5;
+    this.sensorNum = 5;
   }
 
   World.property('instantSpeed', {
@@ -1478,7 +1592,7 @@ World = (function() {
   };
 
   World.prototype.generateMap = function() {
-    var gridSize, intersection, intersectionsNumber, laneNum, map, maxX, maxY, minX, minY, netSize, previous, rect, step, x, y, _i, _j, _k, _l;
+    var gridSize, intersection, intersectionsNumber, laneNum, map, maxX, maxY, minX, minY, netSize, previous, rect, sensorNum, step, x, y, _i, _j, _k, _l;
     this.clear();
     minX = 0;
     maxX = this.netSize - 1;
@@ -1491,6 +1605,7 @@ World = (function() {
     gridSize = settings.gridSize;
     step = 5 * gridSize;
     this.carsNumber = 100;
+    sensorNum = this.sensorNum;
     while (intersectionsNumber > 0) {
       x = _.random(minX, maxX);
       y = _.random(minY, maxY);
@@ -1508,10 +1623,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous, laneNum));
+              this.addRoad(new Road(intersection, previous, laneNum, sensorNum));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection, laneNum));
+              this.addRoad(new Road(previous, intersection, laneNum, sensorNum));
             }
           }
           previous = intersection;
@@ -1525,10 +1640,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous, laneNum));
+              this.addRoad(new Road(intersection, previous, laneNum, sensorNum));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection, laneNum));
+              this.addRoad(new Road(previous, intersection, laneNum, sensorNum));
             }
           }
           previous = intersection;
@@ -1600,7 +1715,7 @@ World = (function() {
   };
 
   World.prototype.onTick = function(delta) {
-    var car, id, intersection, _ref, _ref1, _results;
+    var car, id, intersection, road, _ref, _ref1, _ref2, _results;
     if (delta > 1) {
       throw Error('delta > 1');
     }
@@ -1612,15 +1727,18 @@ World = (function() {
       intersection.controlSignals.onTick(delta);
     }
     _ref1 = this.cars.all();
-    _results = [];
     for (id in _ref1) {
       car = _ref1[id];
       car.move(delta);
       if (!car.alive) {
-        _results.push(this.removeCar(car));
-      } else {
-        _results.push(void 0);
+        this.removeCar(car);
       }
+    }
+    _ref2 = this.roads.all();
+    _results = [];
+    for (id in _ref2) {
+      road = _ref2[id];
+      _results.push(road.updateSensors());
     }
     return _results;
   };
@@ -1692,7 +1810,7 @@ World = (function() {
 module.exports = World;
 
 
-},{"../geom/rect":4,"../helpers":6,"../settings":16,"./car":7,"./intersection":9,"./pool":12,"./road":13,"underscore":32}],16:[function(require,module,exports){
+},{"../geom/rect":4,"../helpers":6,"../settings":17,"./car":7,"./intersection":9,"./pool":12,"./road":13,"underscore":33}],17:[function(require,module,exports){
 'use strict';
 var settings;
 
@@ -1720,7 +1838,7 @@ settings = {
 module.exports = settings;
 
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 var Graphics, PI,
   __slice = [].slice;
@@ -1864,7 +1982,7 @@ Graphics = (function() {
 module.exports = Graphics;
 
 
-},{"../helpers.coffee":6}],18:[function(require,module,exports){
+},{"../helpers.coffee":6}],19:[function(require,module,exports){
 'use strict';
 var Tool, ToolHighlighter, settings,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -1922,7 +2040,7 @@ ToolHighlighter = (function(_super) {
 module.exports = ToolHighlighter;
 
 
-},{"../helpers.coffee":6,"../settings.coffee":16,"./tool.coffee":23}],19:[function(require,module,exports){
+},{"../helpers.coffee":6,"../settings.coffee":17,"./tool.coffee":24}],20:[function(require,module,exports){
 'use strict';
 var Intersection, Tool, ToolIntersectionBuilder,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -1991,7 +2109,7 @@ ToolIntersectionBuilder = (function(_super) {
 module.exports = ToolIntersectionBuilder;
 
 
-},{"../helpers.coffee":6,"../model/intersection.coffee":9,"./tool.coffee":23}],20:[function(require,module,exports){
+},{"../helpers.coffee":6,"../model/intersection.coffee":9,"./tool.coffee":24}],21:[function(require,module,exports){
 'use strict';
 var Tool, ToolIntersectionMover,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -2048,7 +2166,7 @@ ToolIntersectionMover = (function(_super) {
 module.exports = ToolIntersectionMover;
 
 
-},{"../helpers.coffee":6,"./tool.coffee":23}],21:[function(require,module,exports){
+},{"../helpers.coffee":6,"./tool.coffee":24}],22:[function(require,module,exports){
 'use strict';
 var Mover, Tool,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -2104,7 +2222,7 @@ Mover = (function(_super) {
 module.exports = Mover;
 
 
-},{"../helpers.coffee":6,"./tool.coffee":23}],22:[function(require,module,exports){
+},{"../helpers.coffee":6,"./tool.coffee":24}],23:[function(require,module,exports){
 'use strict';
 var Road, Tool, ToolRoadBuilder,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -2189,7 +2307,7 @@ ToolRoadBuilder = (function(_super) {
 module.exports = ToolRoadBuilder;
 
 
-},{"../helpers.coffee":6,"../model/road.coffee":13,"./tool.coffee":23}],23:[function(require,module,exports){
+},{"../helpers.coffee":6,"../model/road.coffee":13,"./tool.coffee":24}],24:[function(require,module,exports){
 'use strict';
 var $, METHODS, Point, Rect, Tool, _;
 
@@ -2280,7 +2398,7 @@ Tool = (function() {
 module.exports = Tool;
 
 
-},{"../geom/point.coffee":3,"../geom/rect.coffee":4,"../helpers.coffee":6,"jquery":31,"jquery-mousewheel":30,"underscore":32}],24:[function(require,module,exports){
+},{"../geom/point.coffee":3,"../geom/rect.coffee":4,"../helpers.coffee":6,"jquery":32,"jquery-mousewheel":31,"underscore":33}],25:[function(require,module,exports){
 'use strict';
 var $, Graphics, PI, Point, Rect, ToolHighlighter, ToolIntersectionBuilder, ToolIntersectionMover, ToolMover, ToolRoadBuilder, Visualizer, Zoomer, chroma, settings, _,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
@@ -2550,7 +2668,7 @@ Visualizer = (function() {
 module.exports = Visualizer;
 
 
-},{"../geom/point":3,"../geom/rect":4,"../helpers":6,"../settings":16,"./graphics":17,"./highlighter":18,"./intersection-builder":19,"./intersection-mover":20,"./mover":21,"./road-builder":22,"./zoomer":25,"chroma-js":26,"jquery":31,"underscore":32}],25:[function(require,module,exports){
+},{"../geom/point":3,"../geom/rect":4,"../helpers":6,"../settings":17,"./graphics":18,"./highlighter":19,"./intersection-builder":20,"./intersection-mover":21,"./mover":22,"./road-builder":23,"./zoomer":26,"chroma-js":27,"jquery":32,"underscore":33}],26:[function(require,module,exports){
 'use strict';
 var Point, Rect, Tool, Zoomer, max, min, settings,
   __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; },
@@ -2660,7 +2778,7 @@ Zoomer = (function(_super) {
 module.exports = Zoomer;
 
 
-},{"../geom/point.coffee":3,"../geom/rect.coffee":4,"../helpers.coffee":6,"../settings.coffee":16,"./tool.coffee":23}],26:[function(require,module,exports){
+},{"../geom/point.coffee":3,"../geom/rect.coffee":4,"../helpers.coffee":6,"../settings.coffee":17,"./tool.coffee":24}],27:[function(require,module,exports){
 // Generated by CoffeeScript 1.6.2
 /** echo  * @license echo  * while read i do echo  *  done echo
 */
@@ -4525,10 +4643,10 @@ module.exports = Zoomer;
 
 }).call(this);
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = require('./vendor/dat.gui')
 module.exports.color = require('./vendor/dat.color')
-},{"./vendor/dat.color":28,"./vendor/dat.gui":29}],28:[function(require,module,exports){
+},{"./vendor/dat.color":29,"./vendor/dat.gui":30}],29:[function(require,module,exports){
 /**
  * dat-gui JavaScript Controller Library
  * http://code.google.com/p/dat-gui
@@ -5284,7 +5402,7 @@ dat.color.math = (function () {
 })(),
 dat.color.toString,
 dat.utils.common);
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 /**
  * dat-gui JavaScript Controller Library
  * http://code.google.com/p/dat-gui
@@ -8945,7 +9063,7 @@ dat.dom.CenteredDiv = (function (dom, common) {
 dat.utils.common),
 dat.dom.dom,
 dat.utils.common);
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 /*!
  * jQuery Mousewheel 3.1.13
  *
@@ -9168,7 +9286,7 @@ dat.utils.common);
 
 }));
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.4
  * http://jquery.com/
@@ -18380,7 +18498,7 @@ return jQuery;
 
 }));
 
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 //     Underscore.js 1.6.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors

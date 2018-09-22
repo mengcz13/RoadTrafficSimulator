@@ -15,6 +15,7 @@ class World
     @set {}
     @laneNum = 2
     @netSize = 5
+    @sensorNum = 5
 
   @property 'instantSpeed',
     get: ->
@@ -62,6 +63,7 @@ class World
     gridSize = settings.gridSize
     step = 5 * gridSize
     @carsNumber = 100
+    sensorNum = @sensorNum
     while intersectionsNumber > 0
       x = _.random minX, maxX
       y = _.random minY, maxY
@@ -76,8 +78,8 @@ class World
         intersection = map[[x, y]]
         if intersection?
           if random() < 0.9
-            @addRoad new Road intersection, previous, laneNum if previous?
-            @addRoad new Road previous, intersection, laneNum if previous?
+            @addRoad new Road intersection, previous, laneNum, sensorNum if previous?
+            @addRoad new Road previous, intersection, laneNum, sensorNum if previous?
           previous = intersection
     for y in [minY..maxY]
       previous = null
@@ -85,8 +87,8 @@ class World
         intersection = map[[x, y]]
         if intersection?
           if random() < 0.9
-            @addRoad new Road intersection, previous, laneNum if previous?
-            @addRoad new Road previous, intersection, laneNum if previous?
+            @addRoad new Road intersection, previous, laneNum, sensorNum if previous?
+            @addRoad new Road previous, intersection, laneNum, sensorNum if previous?
           previous = intersection
 
     @shortestPaths = @_calcShortestPaths()
@@ -137,6 +139,8 @@ class World
     for id, car of @cars.all()
       car.move delta
       @removeCar car unless car.alive
+    for id, road of @roads.all()
+      road.updateSensors()
 
   refreshCars: ->
     @addRandomCar() if @cars.length < @carsNumber
