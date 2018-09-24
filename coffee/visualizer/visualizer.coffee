@@ -120,6 +120,33 @@ class Visualizer
       @graphics.stroke settings.colors.roadMarking
     @ctx.restore()
 
+    # draw sensor data
+    if @debug
+      @ctx.save()
+      @ctx.fillStyle = "black"
+      @ctx.font = "1px Arial"
+      for lane in road.lanes[0..]
+        lline = lane.leftBorder
+        rline = lane.rightBorder
+        spx = (lline.source.x + rline.source.x) / 2
+        spy = (lline.source.y + rline.source.y) / 2
+        tpx = (lline.target.x + rline.target.x) / 2
+        tpy = (lline.target.y + rline.target.y) / 2
+
+        for sid in [0..lane.sensors.length - 1]
+          samplesensor = lane.sensors[sid]
+          px = (spx * (lane.sensors.length - sid) + tpx * sid) / lane.sensors.length
+          py = (spy * (lane.sensors.length - sid) + tpy * sid) / lane.sensors.length
+          @ctx.fillText samplesensor.avgSpeed.toFixed(3), px, py
+          @ctx.fillText samplesensor.carNum, px, py + 1
+          @ctx.fillText samplesensor.volume, px, py + 2
+
+          # samplesensor = lane.sensors[lane.sensors.length - 1]
+          # @ctx.fillText samplesensor.avgSpeed.toFixed(3), tpx, tpy
+          # @ctx.fillText samplesensor.carNum, tpx, tpy + 1
+          # @ctx.fillText samplesensor.volume, tpx, tpy + 2
+      @ctx.restore()
+
   drawCar: (car) ->
     angle = car.direction
     center = car.coords

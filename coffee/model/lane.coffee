@@ -6,7 +6,7 @@ Segment = require '../geom/segment'
 Sensor = require './sensor'
 
 class Lane
-  constructor: (@sourceSegment, @targetSegment, @road, @sensorNum) ->
+  constructor: (@sourceSegment, @targetSegment, @road, @sensorDist) ->
     @leftAdjacent = null
     @rightAdjacent = null
     @leftmostAdjacent = null
@@ -74,6 +74,7 @@ class Lane
     next
 
   setSensors: ->
+    @sensorNum = Math.round (@length / @sensorDist)
     @sensors = []
     @relativeSensorInterval = 1.0 / @sensorNum
     for i in [0..@sensorNum - 1]
@@ -91,7 +92,6 @@ class Lane
         newCarLists[sensorid].push car
     for i in [0..@sensorNum - 1]
       @sensors[i].update newCarLists[i]
-      # if newCarLists[i].length > 1
-      #   console.log @sensors[i]
+      # console.log @sensors[i].avgSpeed, @sensors[i].carNum, @sensors[i].volumeIn, @sensors[i].volumeOut
 
 module.exports = Lane

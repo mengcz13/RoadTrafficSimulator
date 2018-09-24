@@ -839,11 +839,11 @@ Segment = require('../geom/segment');
 Sensor = require('./sensor');
 
 Lane = (function() {
-  function Lane(sourceSegment, targetSegment, road, sensorNum) {
+  function Lane(sourceSegment, targetSegment, road, sensorDist) {
     this.sourceSegment = sourceSegment;
     this.targetSegment = targetSegment;
     this.road = road;
-    this.sensorNum = sensorNum;
+    this.sensorDist = sensorDist;
     this.leftAdjacent = null;
     this.rightAdjacent = null;
     this.leftmostAdjacent = null;
@@ -949,6 +949,7 @@ Lane = (function() {
 
   Lane.prototype.setSensors = function() {
     var i, _i, _ref, _results;
+    this.sensorNum = Math.round(this.length / this.sensorDist);
     this.sensors = [];
     this.relativeSensorInterval = 1.0 / this.sensorNum;
     _results = [];
@@ -976,12 +977,7 @@ Lane = (function() {
     }
     _results = [];
     for (i = _j = 0, _ref2 = this.sensorNum - 1; 0 <= _ref2 ? _j <= _ref2 : _j >= _ref2; i = 0 <= _ref2 ? ++_j : --_j) {
-      this.sensors[i].update(newCarLists[i]);
-      if (newCarLists[i].length > 1) {
-        _results.push(console.log(this.sensors[i]));
-      } else {
-        _results.push(void 0);
-      }
+      _results.push(this.sensors[i].update(newCarLists[i]));
     }
     return _results;
   };
@@ -1072,11 +1068,11 @@ Lane = require('./lane');
 settings = require('../settings');
 
 Road = (function() {
-  function Road(source, target, maxLanesNumber, sensorNum) {
+  function Road(source, target, maxLanesNumber, sensorDist) {
     this.source = source;
     this.target = target;
     this.maxLanesNumber = maxLanesNumber;
-    this.sensorNum = sensorNum;
+    this.sensorDist = sensorDist;
     this.id = _.uniqueId('road');
     this.lanes = [];
     this.lanesNumber = null;
@@ -1149,9 +1145,10 @@ Road = (function() {
       }
       for (i = _i = 0, _ref = this.lanesNumber - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
         if ((_base = this.lanes)[i] == null) {
-          _base[i] = new Lane(sourceSplits[i], targetSplits[i], this, this.sensorNum);
+          _base[i] = new Lane(sourceSplits[i], targetSplits[i], this, this.sensorDist);
         }
       }
+      this.sensorNum = this.lanes[0].sensorNum;
     }
     _results = [];
     for (i = _j = 0, _ref1 = this.lanesNumber - 1; 0 <= _ref1 ? _j <= _ref1 : _j >= _ref1; i = 0 <= _ref1 ? ++_j : --_j) {
@@ -1592,7 +1589,7 @@ World = (function() {
   };
 
   World.prototype.generateMap = function() {
-    var gridSize, intersection, intersectionsNumber, laneNum, map, maxX, maxY, minX, minY, netSize, previous, rect, sensorNum, step, x, y, _i, _j, _k, _l;
+    var gridSize, intersection, intersectionsNumber, laneNum, map, maxX, maxY, minX, minY, netSize, previous, rect, sensorDist, step, x, y, _i, _j, _k, _l;
     this.clear();
     minX = 0;
     maxX = this.netSize - 1;
@@ -1605,7 +1602,7 @@ World = (function() {
     gridSize = settings.gridSize;
     step = 5 * gridSize;
     this.carsNumber = 100;
-    sensorNum = this.sensorNum;
+    sensorDist = step / this.sensorNum;
     while (intersectionsNumber > 0) {
       x = _.random(minX, maxX);
       y = _.random(minY, maxY);
@@ -1623,10 +1620,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous, laneNum, sensorNum));
+              this.addRoad(new Road(intersection, previous, laneNum, sensorDist));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection, laneNum, sensorNum));
+              this.addRoad(new Road(previous, intersection, laneNum, sensorDist));
             }
           }
           previous = intersection;
@@ -1640,10 +1637,10 @@ World = (function() {
         if (intersection != null) {
           if (random() < 0.9) {
             if (previous != null) {
-              this.addRoad(new Road(intersection, previous, laneNum, sensorNum));
+              this.addRoad(new Road(intersection, previous, laneNum, sensorDist));
             }
             if (previous != null) {
-              this.addRoad(new Road(previous, intersection, laneNum, sensorNum));
+              this.addRoad(new Road(previous, intersection, laneNum, sensorDist));
             }
           }
           previous = intersection;
@@ -2502,7 +2499,7 @@ Visualizer = (function() {
   };
 
   Visualizer.prototype.drawRoad = function(road, alpha) {
-    var dashSize, lane, leftLine, line, rightLine, sourceSide, targetSide, _i, _len, _ref;
+    var dashSize, lane, leftLine, line, lline, px, py, rightLine, rline, samplesensor, sid, sourceSide, spx, spy, targetSide, tpx, tpy, _i, _j, _k, _len, _len1, _ref, _ref1, _ref2;
     if ((road.source == null) || (road.target == null)) {
       throw Error('invalid road');
     }
@@ -2531,7 +2528,31 @@ Visualizer = (function() {
       this.ctx.setLineDash([dashSize]);
       this.graphics.stroke(settings.colors.roadMarking);
     }
-    return this.ctx.restore();
+    this.ctx.restore();
+    if (this.debug) {
+      this.ctx.save();
+      this.ctx.fillStyle = "black";
+      this.ctx.font = "1px Arial";
+      _ref1 = road.lanes.slice(0);
+      for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+        lane = _ref1[_j];
+        lline = lane.leftBorder;
+        rline = lane.rightBorder;
+        spx = (lline.source.x + rline.source.x) / 2;
+        spy = (lline.source.y + rline.source.y) / 2;
+        tpx = (lline.target.x + rline.target.x) / 2;
+        tpy = (lline.target.y + rline.target.y) / 2;
+        for (sid = _k = 0, _ref2 = lane.sensors.length - 1; 0 <= _ref2 ? _k <= _ref2 : _k >= _ref2; sid = 0 <= _ref2 ? ++_k : --_k) {
+          samplesensor = lane.sensors[sid];
+          px = (spx * (lane.sensors.length - sid) + tpx * sid) / lane.sensors.length;
+          py = (spy * (lane.sensors.length - sid) + tpy * sid) / lane.sensors.length;
+          this.ctx.fillText(samplesensor.avgSpeed.toFixed(3), px, py);
+          this.ctx.fillText(samplesensor.carNum, px, py + 1);
+          this.ctx.fillText(samplesensor.volume, px, py + 2);
+        }
+      }
+      return this.ctx.restore();
+    }
   };
 
   Visualizer.prototype.drawCar = function(car) {
