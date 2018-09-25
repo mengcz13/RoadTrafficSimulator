@@ -14,6 +14,7 @@ class Trajectory
     @next = new LanePosition @car
     @temp = new LanePosition @car
     @isChangingLanes = false
+    @isPassingIntersection = false
 
   @property 'lane',
     get: -> @temp.lane or @current.lane
@@ -81,8 +82,11 @@ class Trajectory
     @current.position += distance
     @next.position += distance
     @temp.position += distance
+    targetIntersection = @current.lane.road.target
     if @timeToMakeTurn() and @canEnterIntersection() and @isValidTurn()
       @_startChangingLanes @car.popNextLane(), 0
+      if @isPassingIntersection
+        targetIntersection.addCarPosition @temp
     tempRelativePosition = @temp.position / @temp.lane?.length
     gap = 2 * @car.length
     if @isChangingLanes and @temp.position > gap and not @current.free
@@ -91,6 +95,8 @@ class Trajectory
     @temp.position + gap > @temp.lane?.length
       @next.acquire()
     if @isChangingLanes and tempRelativePosition >= 1
+      if @isPassingIntersection
+        targetIntersection.removeCar @temp
       @_finishChangingLanes()
     if @current.lane and not @isChangingLanes and not @car.nextLane
       @car.pickNextLane()
@@ -124,6 +130,10 @@ class Trajectory
     throw Error 'already changing lane' if @isChangingLanes
     throw Error 'no next lane' unless nextLane?
     @isChangingLanes = true
+    if @current.lane.road.target.id == nextLane.road.source.id
+      @isPassingIntersection = true
+    else
+      @isPassingIntersection = false
     @next.lane = nextLane
     @next.position = nextPosition
 
@@ -136,6 +146,7 @@ class Trajectory
   _finishChangingLanes: ->
     throw Error 'no lane changing is going on' unless @isChangingLanes
     @isChangingLanes = false
+    @isPassingIntersection = false
     # TODO swap current and next
     @current.lane = @next.lane
     @current.position = @next.position or 0

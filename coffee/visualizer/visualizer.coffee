@@ -84,9 +84,19 @@ class Visualizer
       @ctx.fillStyle = "black"
       @ctx.font = "1px Arial"
       center = intersection.rect.center()
-      flipInterval = Math.round(intersection.controlSignals.flipInterval * 100) / 100
-      phaseOffset = Math.round(intersection.controlSignals.phaseOffset * 100) / 100
-      @ctx.fillText flipInterval + ' ' + phaseOffset, center.x, center.y
+      # flipInterval = Math.round(intersection.controlSignals.flipInterval * 100) / 100
+      # phaseOffset = Math.round(intersection.controlSignals.phaseOffset * 100) / 100
+      # @ctx.fillText flipInterval + ' ' + phaseOffset, center.x, center.y
+
+      # draw sensor at intersection
+      samplesensor = intersection.sensor
+      px = center.x
+      py = center.y
+      @ctx.fillText samplesensor.avgSpeed.toFixed(3), px, py
+      @ctx.fillText samplesensor.carNum, px, py + 1
+      @ctx.fillText samplesensor.volumeIn, px, py + 2
+      @ctx.fillText samplesensor.volumeOut, px, py + 3
+
       @ctx.restore()
 
   drawRoad: (road, alpha) ->
@@ -139,7 +149,8 @@ class Visualizer
           py = (spy * (lane.sensors.length - sid) + tpy * sid) / lane.sensors.length
           @ctx.fillText samplesensor.avgSpeed.toFixed(3), px, py
           @ctx.fillText samplesensor.carNum, px, py + 1
-          @ctx.fillText samplesensor.volume, px, py + 2
+          @ctx.fillText samplesensor.volumeIn, px, py + 2
+          @ctx.fillText samplesensor.volumeOut, px, py + 3
 
           # samplesensor = lane.sensors[lane.sensors.length - 1]
           # @ctx.fillText samplesensor.avgSpeed.toFixed(3), tpx, tpy
@@ -168,6 +179,7 @@ class Visualizer
       @ctx.fillStyle = "black"
       @ctx.font = "1px Arial"
       @ctx.fillText car.id, center.x, center.y
+      @ctx.fillText car.trajectory.relativePosition.toFixed(3), center.x, center.y + 1
 
       if (curve = car.trajectory.temp?.lane)?
         @graphics.drawCurve curve, 0.1, 'red'

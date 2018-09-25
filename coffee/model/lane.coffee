@@ -78,7 +78,7 @@ class Lane
     @sensors = []
     @relativeSensorInterval = 1.0 / @sensorNum
     for i in [0..@sensorNum - 1]
-      @sensors[i] = new Sensor this, @relativeSensorInterval * i, @relativeSensorInterval * (i + 1)
+      @sensors[i] = new Sensor # this, @relativeSensorInterval * i, @relativeSensorInterval * (i + 1)
 
   updateSensors : ->
     newCarLists = []

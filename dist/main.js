@@ -683,7 +683,7 @@ module.exports = ControlSignals;
 
 },{"../helpers":6,"../settings":17}],9:[function(require,module,exports){
 'use strict';
-var ControlSignals, Intersection, Rect, _;
+var ControlSignals, Intersection, Rect, Sensor, _;
 
 require('../helpers');
 
@@ -693,6 +693,8 @@ ControlSignals = require('./control-signals');
 
 Rect = require('../geom/rect');
 
+Sensor = require('./sensor');
+
 Intersection = (function() {
   function Intersection(rect) {
     this.rect = rect;
@@ -700,6 +702,8 @@ Intersection = (function() {
     this.roads = [];
     this.inRoads = [];
     this.controlSignals = new ControlSignals(this);
+    this.carsPositions = {};
+    this.setSensor();
   }
 
   Intersection.copy = function(intersection) {
@@ -738,6 +742,32 @@ Intersection = (function() {
     return _results;
   };
 
+  Intersection.prototype.addCarPosition = function(carPosition) {
+    if (carPosition.id in this.carsPositions) {
+      throw Error('car is already here');
+    }
+    return this.carsPositions[carPosition.id] = carPosition;
+  };
+
+  Intersection.prototype.removeCar = function(carPosition) {
+    if (!(carPosition.id in this.carsPositions)) {
+      throw Error('removing unknown car');
+    }
+    return delete this.carsPositions[carPosition.id];
+  };
+
+  Intersection.prototype.setSensor = function() {
+    return this.sensor = new Sensor;
+  };
+
+  Intersection.prototype.updateSensor = function() {
+    var newCarList;
+    newCarList = _.map(this.carsPositions, function(carPosition) {
+      return carPosition.car;
+    });
+    return this.sensor.update(newCarList);
+  };
+
   return Intersection;
 
 })();
@@ -745,7 +775,7 @@ Intersection = (function() {
 module.exports = Intersection;
 
 
-},{"../geom/rect":4,"../helpers":6,"./control-signals":8,"underscore":33}],10:[function(require,module,exports){
+},{"../geom/rect":4,"../helpers":6,"./control-signals":8,"./sensor":14,"underscore":33}],10:[function(require,module,exports){
 'use strict';
 var LanePosition, _;
 
@@ -954,7 +984,7 @@ Lane = (function() {
     this.relativeSensorInterval = 1.0 / this.sensorNum;
     _results = [];
     for (i = _i = 0, _ref = this.sensorNum - 1; 0 <= _ref ? _i <= _ref : _i >= _ref; i = 0 <= _ref ? ++_i : --_i) {
-      _results.push(this.sensors[i] = new Sensor(this, this.relativeSensorInterval * i, this.relativeSensorInterval * (i + 1)));
+      _results.push(this.sensors[i] = new Sensor);
     }
     return _results;
   };
@@ -1186,10 +1216,7 @@ var Sensor, _;
 _ = require('underscore');
 
 Sensor = (function() {
-  function Sensor(lane, starting, ending) {
-    this.lane = lane;
-    this.starting = starting;
-    this.ending = ending;
+  function Sensor() {
     this.id = _.uniqueId('Sensor');
     this.carList = [];
     this.volumeIn = 0;
@@ -1224,10 +1251,16 @@ Sensor = (function() {
   });
 
   Sensor.prototype.update = function(newCarList) {
-    var sameCarList;
+    var sameCarList, tempvolumeIn, tempvolumeOut;
     sameCarList = _.intersection(this.carList, newCarList);
-    this.volumeIn = newCarList.length - sameCarList.length;
-    this.volumeOut = this.carList.length - sameCarList.length;
+    tempvolumeIn = newCarList.length - sameCarList.length;
+    if (tempvolumeIn > 0) {
+      this.volumeIn += tempvolumeIn;
+    }
+    tempvolumeOut = this.carList.length - sameCarList.length;
+    if (tempvolumeOut > 0) {
+      this.volumeOut += tempvolumeOut;
+    }
     return this.carList = newCarList;
   };
 
@@ -1263,6 +1296,7 @@ Trajectory = (function() {
     this.next = new LanePosition(this.car);
     this.temp = new LanePosition(this.car);
     this.isChangingLanes = false;
+    this.isPassingIntersection = false;
   }
 
   Trajectory.property('lane', {
@@ -1384,13 +1418,17 @@ Trajectory = (function() {
   };
 
   Trajectory.prototype.moveForward = function(distance) {
-    var gap, tempRelativePosition, _ref, _ref1;
+    var gap, targetIntersection, tempRelativePosition, _ref, _ref1;
     distance = max(distance, 0);
     this.current.position += distance;
     this.next.position += distance;
     this.temp.position += distance;
+    targetIntersection = this.current.lane.road.target;
     if (this.timeToMakeTurn() && this.canEnterIntersection() && this.isValidTurn()) {
       this._startChangingLanes(this.car.popNextLane(), 0);
+      if (this.isPassingIntersection) {
+        targetIntersection.addCarPosition(this.temp);
+      }
     }
     tempRelativePosition = this.temp.position / ((_ref = this.temp.lane) != null ? _ref.length : void 0);
     gap = 2 * this.car.length;
@@ -1401,6 +1439,9 @@ Trajectory = (function() {
       this.next.acquire();
     }
     if (this.isChangingLanes && tempRelativePosition >= 1) {
+      if (this.isPassingIntersection) {
+        targetIntersection.removeCar(this.temp);
+      }
       this._finishChangingLanes();
     }
     if (this.current.lane && !this.isChangingLanes && !this.car.nextLane) {
@@ -1456,6 +1497,11 @@ Trajectory = (function() {
       throw Error('no next lane');
     }
     this.isChangingLanes = true;
+    if (this.current.lane.road.target.id === nextLane.road.source.id) {
+      this.isPassingIntersection = true;
+    } else {
+      this.isPassingIntersection = false;
+    }
     this.next.lane = nextLane;
     this.next.position = nextPosition;
     curve = this._getCurve();
@@ -1469,6 +1515,7 @@ Trajectory = (function() {
       throw Error('no lane changing is going on');
     }
     this.isChangingLanes = false;
+    this.isPassingIntersection = false;
     this.current.lane = this.next.lane;
     this.current.position = this.next.position || 0;
     this.current.acquire();
@@ -1712,7 +1759,7 @@ World = (function() {
   };
 
   World.prototype.onTick = function(delta) {
-    var car, id, intersection, road, _ref, _ref1, _ref2, _results;
+    var car, id, intersection, _ref, _ref1;
     if (delta > 1) {
       throw Error('delta > 1');
     }
@@ -1731,13 +1778,7 @@ World = (function() {
         this.removeCar(car);
       }
     }
-    _ref2 = this.roads.all();
-    _results = [];
-    for (id in _ref2) {
-      road = _ref2[id];
-      _results.push(road.updateSensors());
-    }
-    return _results;
+    return this.updateSensors();
   };
 
   World.prototype.refreshCars = function() {
@@ -1798,6 +1839,22 @@ World = (function() {
     if (car != null) {
       return this.removeCar(car);
     }
+  };
+
+  World.prototype.updateSensors = function() {
+    var id, intersection, road, _ref, _ref1, _results;
+    _ref = this.roads.all();
+    for (id in _ref) {
+      road = _ref[id];
+      road.updateSensors();
+    }
+    _ref1 = this.intersections.all();
+    _results = [];
+    for (id in _ref1) {
+      intersection = _ref1[id];
+      _results.push(intersection.updateSensor());
+    }
+    return _results;
   };
 
   return World;
@@ -2463,7 +2520,7 @@ Visualizer = (function() {
   };
 
   Visualizer.prototype.drawSignals = function(road) {
-    var center, flipInterval, intersection, lights, lightsColors, phaseOffset, segment, sideId;
+    var center, intersection, lights, lightsColors, px, py, samplesensor, segment, sideId;
     lightsColors = [settings.colors.redLight, settings.colors.greenLight];
     intersection = road.target;
     segment = road.targetSide;
@@ -2491,9 +2548,13 @@ Visualizer = (function() {
       this.ctx.fillStyle = "black";
       this.ctx.font = "1px Arial";
       center = intersection.rect.center();
-      flipInterval = Math.round(intersection.controlSignals.flipInterval * 100) / 100;
-      phaseOffset = Math.round(intersection.controlSignals.phaseOffset * 100) / 100;
-      this.ctx.fillText(flipInterval + ' ' + phaseOffset, center.x, center.y);
+      samplesensor = intersection.sensor;
+      px = center.x;
+      py = center.y;
+      this.ctx.fillText(samplesensor.avgSpeed.toFixed(3), px, py);
+      this.ctx.fillText(samplesensor.carNum, px, py + 1);
+      this.ctx.fillText(samplesensor.volumeIn, px, py + 2);
+      this.ctx.fillText(samplesensor.volumeOut, px, py + 3);
       return this.ctx.restore();
     }
   };
@@ -2548,7 +2609,8 @@ Visualizer = (function() {
           py = (spy * (lane.sensors.length - sid) + tpy * sid) / lane.sensors.length;
           this.ctx.fillText(samplesensor.avgSpeed.toFixed(3), px, py);
           this.ctx.fillText(samplesensor.carNum, px, py + 1);
-          this.ctx.fillText(samplesensor.volume, px, py + 2);
+          this.ctx.fillText(samplesensor.volumeIn, px, py + 2);
+          this.ctx.fillText(samplesensor.volumeOut, px, py + 3);
         }
       }
       return this.ctx.restore();
@@ -2575,6 +2637,7 @@ Visualizer = (function() {
       this.ctx.fillStyle = "black";
       this.ctx.font = "1px Arial";
       this.ctx.fillText(car.id, center.x, center.y);
+      this.ctx.fillText(car.trajectory.relativePosition.toFixed(3), center.x, center.y + 1);
       if ((curve = (_ref = car.trajectory.temp) != null ? _ref.lane : void 0) != null) {
         this.graphics.drawCurve(curve, 0.1, 'red');
       }

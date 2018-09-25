@@ -3,7 +3,7 @@
 _ = require 'underscore'
 
 class Sensor
-  constructor: (@lane, @starting, @ending) ->
+  constructor: ->
     @id = _.uniqueId 'Sensor'
     @carList = []
     @volumeIn = 0
@@ -23,8 +23,12 @@ class Sensor
 
   update: (newCarList) ->
     sameCarList = _.intersection @carList, newCarList
-    @volumeIn = newCarList.length - sameCarList.length
-    @volumeOut = @carList.length - sameCarList.length
+    tempvolumeIn = newCarList.length - sameCarList.length
+    if tempvolumeIn > 0
+      @volumeIn += tempvolumeIn
+    tempvolumeOut = @carList.length - sameCarList.length
+    if tempvolumeOut > 0
+      @volumeOut += tempvolumeOut
     @carList = newCarList
 
 module.exports = Sensor

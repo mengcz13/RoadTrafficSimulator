@@ -139,8 +139,7 @@ class World
     for id, car of @cars.all()
       car.move delta
       @removeCar car unless car.alive
-    for id, road of @roads.all()
-      road.updateSensors()
+    @updateSensors()
 
   refreshCars: ->
     @addRandomCar() if @cars.length < @carsNumber
@@ -181,5 +180,11 @@ class World
     car = _.sample @cars.all()
     if car?
       @removeCar car
+
+  updateSensors: ->
+    for id, road of @roads.all()
+      road.updateSensors()
+    for id, intersection of @intersections.all()
+      intersection.updateSensor()
 
 module.exports = World
