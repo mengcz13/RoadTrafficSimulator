@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "description": "Simulator of road networks with signal-controlled intersections",
   "scripts": {
-    "test": "gulp test"
+    "test": "gulp test",
+    "rungui": "gulp && npm install"
   },
   "author": {
     "name": "Artem Volkhin",
@@ -25,7 +26,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "coffeescript": "^2.3.1"
+    "coffeescript": "^2.3.1",
+    "commander": "^2.18.0"
   },
   "devDependencies": {
     "blanket": "~1.1",

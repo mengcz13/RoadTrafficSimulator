@@ -1760,6 +1760,7 @@ World = (function() {
 
   World.prototype.onTick = function(delta) {
     var car, id, intersection, _ref, _ref1;
+    console.log(delta);
     if (delta > 1) {
       throw Error('delta > 1');
     }
